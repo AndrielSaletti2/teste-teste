@@ -7,6 +7,7 @@ import {
   deleteRental
 } from '../controllers/rentalController.js';
 import { authenticate } from '../middleware/auth.js';
+import { validateRental } from '../middleware/validation.js';
 
 const router = express.Router();
 
@@ -14,7 +15,7 @@ router.use(authenticate);
 
 router.get('/', getRentals);
 router.get('/:id', getRental);
-router.post('/', createRental);
+router.post('/', validateRental, createRental);
 router.put('/:id', updateRental);
 router.delete('/:id', deleteRental);
 

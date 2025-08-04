@@ -299,7 +299,44 @@ class ApiService {
 
   // Rentals
   async getRentals(page = 1, limit = 10): Promise<PaginatedResponse<Rental>> {
-    const response = await this.request<PaginatedResponse<Rental>>(`/rentals?page=${page}&limit=${limit}`);
+    const response = await this.request<ApiResponse<PaginatedResponse<Rental>>>(`/rentals?page=${page}&limit=${limit}`);
+    
+    if (response.success) {
+      return {
+        data: response.data,
+        total: response.total,
+        page: response.page,
+        limit: response.limit,
+        totalPages: response.totalPages
+      };
+    }
+    
+    throw new Error(response.message);
+  }
+
+  async searchRentals(page = 1, limit = 10, search = ''): Promise<PaginatedResponse<Rental>> {
+    const response = await this.request<ApiResponse<PaginatedResponse<Rental>>>(`/rentals?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`);
+    
+    if (response.success) {
+      return {
+        data: response.data,
+        total: response.total,
+        page: response.page,
+        limit: response.limit,
+        totalPages: response.totalPages
+      };
+    }
+    
+    throw new Error(response.message);
+  }
+
+  async getAvailableLockers(): Promise<Locker[]> {
+    const response = await this.request<PaginatedResponse<Locker>>('/lockers?page=1&limit=100');
+    return response.data?.filter(locker => locker.status === 'available') || [];
+  }
+
+  async getActiveStudents(): Promise<Student[]> {
+    const response = await this.request<PaginatedResponse<Student>>('/students?page=1&limit=100');
     return response;
   }
 
@@ -314,27 +351,45 @@ class ApiService {
   }
 
   async createRental(rental: Omit<Rental, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Rental>> {
+    console.log('🏠 Creating rental:', rental);
+    
     const response = await this.request<ApiResponse<Rental>>('/rentals', {
       method: 'POST',
       body: JSON.stringify(rental),
     });
 
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+
     return response;
   }
 
   async updateRental(id: string, rental: Partial<Rental>): Promise<ApiResponse<Rental>> {
+    console.log('🔄 Updating rental:', id, rental);
+    
     const response = await this.request<ApiResponse<Rental>>(`/rentals/${id}`, {
       method: 'PUT',
       body: JSON.stringify(rental),
     });
 
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+
     return response;
   }
 
   async deleteRental(id: string): Promise<ApiResponse<null>> {
+    console.log('🗑️ Deleting rental:', id);
+    
     const response = await this.request<ApiResponse<null>>(`/rentals/${id}`, {
       method: 'DELETE',
     });
+
+    if (!response.success) {
+      throw new Error(response.message);
+    }
 
     return response;
   }

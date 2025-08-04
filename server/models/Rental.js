@@ -21,8 +21,7 @@ export class Rental {
         `, { count: 'exact' });
 
       if (search) {
-        // For complex searches involving joined tables, we might need to adjust this
-        query = query.or(`notes.ilike.%${search}%`);
+        query = query.or(`notes.ilike.%${search}%,status.ilike.%${search}%,payment_status.ilike.%${search}%`);
       }
 
       const { data, error, count } = await query
@@ -157,14 +156,6 @@ export class Rental {
 
   static async getStats() {
     try {
-      const { data: totalRentals, error: totalError } = await supabase
-        .from('rentals')
-        .select('id', { count: 'exact' });
-
-      if (totalError) {
-        throw totalError;
-      }
-
       const { data: activeRentals, error: activeError } = await supabase
         .from('rentals')
         .select('id', { count: 'exact' })
@@ -205,11 +196,10 @@ export class Rental {
       const totalRevenue = revenueData.reduce((sum, rental) => sum + parseFloat(rental.total_amount), 0);
 
       return {
-        total: totalRentals.length,
         active: activeRentals.length,
         overdue: overdueRentals.length,
         completed: completedRentals.length,
-        revenue: totalRevenue
+        total_revenue: totalRevenue
       };
     } catch (error) {
       console.error('Error getting rental stats:', error);
@@ -277,6 +267,43 @@ export class Rental {
       return data;
     } catch (error) {
       console.error('Error finding rentals by locker ID:', error);
+      throw error;
+    }
+  }
+  static async getActiveRentalsByLockerId(lockerId) {
+    try {
+      const { data, error } = await supabase
+        .from('rentals')
+        .select('*')
+        .eq('locker_id', lockerId)
+        .in('status', ['active', 'overdue']);
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error finding active rentals by locker ID:', error);
+      throw error;
+    }
+  }
+
+  static async getActiveRentalsByStudentId(studentId) {
+    try {
+      const { data, error } = await supabase
+        .from('rentals')
+        .select('*')
+        .eq('student_id', studentId)
+        .in('status', ['active', 'overdue']);
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error finding active rentals by student ID:', error);
       throw error;
     }
   }

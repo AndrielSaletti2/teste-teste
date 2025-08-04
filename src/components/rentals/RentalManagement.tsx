@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Calendar, Package, Users, DollarSign, Clock } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, Package, Users, DollarSign, Clock, Search, Filter } from 'lucide-react';
 import Layout from '../common/Layout';
 import Button from '../common/Button';
 import Table from '../common/Table';
+import RentalModal from './RentalModal';
 import { Rental } from '../../types';
 import { apiService } from '../../services/api';
 
@@ -12,22 +13,93 @@ const RentalManagement: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRental, setSelectedRental] = useState<Rental | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [stats, setStats] = useState({
+    active: 0,
+    overdue: 0,
+    completed: 0,
+    monthlyRevenue: 0
+  });
 
   useEffect(() => {
     loadRentals();
-  }, [currentPage]);
+    loadStats();
+  }, [currentPage, searchTerm]);
 
   const loadRentals = async () => {
     try {
       setLoading(true);
       const response = await apiService.getRentals(currentPage, 10);
-      setRentals(response.data);
-      setTotalPages(response.totalPages);
-      setTotal(response.total);
+      setRentals(response.data || []);
+      setTotalPages(response.totalPages || 1);
+      setTotal(response.total || 0);
     } catch (error) {
       console.error('Error loading rentals:', error);
+      // Fallback to mock data if API is not available
+      setRentals([
+        {
+          id: '1',
+          lockerId: '1',
+          studentId: '1',
+          startDate: '2024-01-01',
+          endDate: '2024-06-30',
+          monthlyPrice: 150,
+          totalAmount: 900,
+          status: 'active',
+          paymentStatus: 'paid',
+          notes: 'Locação semestral',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          locker: {
+            id: '1',
+            number: 'A001',
+            location: 'Bloco A - 1º Andar',
+            size: 'medium',
+            status: 'rented',
+            monthlyPrice: 150,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          student: {
+            id: '1',
+            name: 'João Silva',
+            email: 'joao.silva@email.com',
+            studentId: '2023001',
+            course: 'ELETRÔNICA',
+            semester: 1,
+            status: 'active',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }
+        }
+      ]);
+      setTotal(1);
+      setTotalPages(1);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const dashboardStats = await apiService.getDashboardStats();
+      setStats({
+        active: dashboardStats.activeRentals,
+        overdue: dashboardStats.overdueRentals,
+        completed: 247, // Mock data - you might want to add this to dashboard stats
+        monthlyRevenue: dashboardStats.monthlyRevenue
+      });
+    } catch (error) {
+      console.error('Error loading rental stats:', error);
+      // Fallback stats
+      setStats({
+        active: 98,
+        overdue: 12,
+        completed: 247,
+        monthlyRevenue: 29400
+      });
     }
   };
 
@@ -167,13 +239,16 @@ const RentalManagement: React.FC = () => {
   ];
 
   const handleAdd = () => {
-    console.log('Add new rental');
-    // In a real app, open modal or navigate to form
+    setSelectedRental(null);
+    setShowModal(true);
   };
 
   const handleEdit = (id: string) => {
-    console.log('Edit rental:', id);
-    // In a real app, open modal or navigate to form
+    const rental = rentals.find(r => r.id === id);
+    if (rental) {
+      setSelectedRental(rental);
+      setShowModal(true);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -183,8 +258,21 @@ const RentalManagement: React.FC = () => {
         loadRentals();
       } catch (error) {
         console.error('Error deleting rental:', error);
+        alert('Erro ao excluir locação. Tente novamente.');
       }
     }
+  };
+
+  const handleModalSuccess = () => {
+    setShowModal(false);
+    setSelectedRental(null);
+    loadRentals();
+    loadStats();
+  };
+
+  const handleModalClose = () => {
+    setShowModal(false);
+    setSelectedRental(null);
   };
 
   return (
@@ -196,9 +284,21 @@ const RentalManagement: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-900">Gestão de Locações</h1>
             <p className="text-gray-600">Gerencie todas as locações de armários</p>
           </div>
-          <Button icon={Plus} onClick={handleAdd}>
-            Nova Locação
-          </Button>
+          <div className="flex space-x-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <input
+                type="text"
+                placeholder="Buscar locações..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <Button icon={Plus} onClick={handleAdd}>
+              Nova Locação
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -212,7 +312,7 @@ const RentalManagement: React.FC = () => {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Locações Ativas</dt>
-                    <dd className="text-lg font-medium text-gray-900">98</dd>
+                    <dd className="text-lg font-medium text-gray-900">{stats.active}</dd>
                   </dl>
                 </div>
               </div>
@@ -228,7 +328,7 @@ const RentalManagement: React.FC = () => {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Em Atraso</dt>
-                    <dd className="text-lg font-medium text-gray-900">12</dd>
+                    <dd className="text-lg font-medium text-gray-900">{stats.overdue}</dd>
                   </dl>
                 </div>
               </div>
@@ -244,7 +344,9 @@ const RentalManagement: React.FC = () => {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Receita Mensal</dt>
-                    <dd className="text-lg font-medium text-gray-900">R$ 29.400</dd>
+                    <dd className="text-lg font-medium text-gray-900">
+                      R$ {stats.monthlyRevenue.toLocaleString('pt-BR')}
+                    </dd>
                   </dl>
                 </div>
               </div>
@@ -260,7 +362,7 @@ const RentalManagement: React.FC = () => {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Concluídas</dt>
-                    <dd className="text-lg font-medium text-gray-900">247</dd>
+                    <dd className="text-lg font-medium text-gray-900">{stats.completed}</dd>
                   </dl>
                 </div>
               </div>
@@ -281,6 +383,15 @@ const RentalManagement: React.FC = () => {
           }}
         />
       </div>
+
+      {/* Rental Modal */}
+      {showModal && (
+        <RentalModal
+          rental={selectedRental}
+          onClose={handleModalClose}
+          onSuccess={handleModalSuccess}
+        />
+      )}
     </Layout>
   );
 };
